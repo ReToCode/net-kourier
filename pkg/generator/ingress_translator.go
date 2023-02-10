@@ -48,11 +48,13 @@ import (
 type translatedIngress struct {
 	name                    types.NamespacedName
 	listenerPort            string
-	sniMatches              []*envoy.SNIMatch
+	internalSNIMatches      []*envoy.SNIMatch
+	externalSNIMatches      []*envoy.SNIMatch
 	clusters                []*v3.Cluster
 	externalVirtualHosts    []*route.VirtualHost
 	externalTLSVirtualHosts []*route.VirtualHost
 	internalVirtualHosts    []*route.VirtualHost
+	internalTLSVirtualHosts []*route.VirtualHost
 }
 
 type IngressTranslator struct {
@@ -81,7 +83,8 @@ func NewIngressTranslator(
 func (translator *IngressTranslator) translateIngress(ctx context.Context, ingress *v1alpha1.Ingress, extAuthzEnabled bool) (*translatedIngress, error) {
 	logger := logging.FromContext(ctx)
 
-	sniMatches := make([]*envoy.SNIMatch, 0, len(ingress.Spec.TLS))
+	internalSNIMatches := make([]*envoy.SNIMatch, 0, len(ingress.Spec.TLS))
+	externalSNIMatches := make([]*envoy.SNIMatch, 0, len(ingress.Spec.TLS))
 	for _, ingressTLS := range ingress.Spec.TLS {
 		if err := trackSecret(translator.tracker, ingressTLS.SecretNamespace, ingressTLS.SecretName, ingress); err != nil {
 			return nil, err
@@ -96,14 +99,24 @@ func (translator *IngressTranslator) translateIngress(ctx context.Context, ingre
 			Namespace: ingressTLS.SecretNamespace,
 			Name:      ingressTLS.SecretName,
 		}
-		sniMatches = append(sniMatches, &envoy.SNIMatch{
+
+		sniMatch := &envoy.SNIMatch{
 			Hosts:            ingressTLS.Hosts,
 			CertSource:       secretRef,
 			CertificateChain: secret.Data[certFieldInSecret],
-			PrivateKey:       secret.Data[keyFieldInSecret]})
+			PrivateKey:       secret.Data[keyFieldInSecret],
+		}
+
+		// TODO: find a better way to do this
+		if strings.HasSuffix(ingressTLS.SecretName, "-internal") {
+			internalSNIMatches = append(internalSNIMatches, sniMatch)
+		} else {
+			externalSNIMatches = append(externalSNIMatches, sniMatch)
+		}
 	}
 
 	internalHosts := make([]*route.VirtualHost, 0, len(ingress.Spec.Rules))
+	internalTLSHosts := make([]*route.VirtualHost, 0, len(ingress.Spec.Rules))
 	externalHosts := make([]*route.VirtualHost, 0, len(ingress.Spec.Rules))
 	externalTLSHosts := make([]*route.VirtualHost, 0, len(ingress.Spec.Rules))
 	clusters := make([]*v3.Cluster, 0, len(ingress.Spec.Rules))
@@ -266,8 +279,12 @@ func (translator *IngressTranslator) translateIngress(ctx context.Context, ingre
 			}
 		}
 
-		internalHosts = append(internalHosts, virtualHost)
-		if rule.Visibility == v1alpha1.IngressVisibilityExternalIP {
+		if rule.Visibility == v1alpha1.IngressVisibilityClusterLocal {
+			internalHosts = append(internalHosts, virtualHost)
+			if virtualTLSHost != nil {
+				internalTLSHosts = append(internalTLSHosts, virtualTLSHost)
+			}
+		} else if rule.Visibility == v1alpha1.IngressVisibilityExternalIP {
 			externalHosts = append(externalHosts, virtualHost)
 			if virtualTLSHost != nil {
 				externalTLSHosts = append(externalTLSHosts, virtualTLSHost)
@@ -299,11 +316,13 @@ func (translator *IngressTranslator) translateIngress(ctx context.Context, ingre
 			Name:      ingress.Name,
 		},
 		listenerPort:            listenerPort,
-		sniMatches:              sniMatches,
+		internalSNIMatches:      internalSNIMatches,
+		externalSNIMatches:      externalSNIMatches,
 		clusters:                clusters,
 		externalVirtualHosts:    externalHosts,
 		externalTLSVirtualHosts: externalTLSHosts,
 		internalVirtualHosts:    internalHosts,
+		internalTLSVirtualHosts: internalTLSHosts,
 	}, nil
 }
 

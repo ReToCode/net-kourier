@@ -39,9 +39,6 @@ const (
 	// enableProxyProtocol is the config map key for enabling proxy protocol
 	enableProxyProtocol = "enable-proxy-protocol"
 
-	// clusterCert is the config map key for kourier internal certificates
-	clusterCert = "cluster-cert-secret"
-
 	// IdleTimeoutKey is the config map key for the amount of time that Kourier waits
 	// for incoming requests. This value is set to "stream_idle_timeout" in Envoy.
 	IdleTimeoutKey = "stream-idle-timeout"
@@ -60,7 +57,6 @@ func DefaultConfig() *Kourier {
 	return &Kourier{
 		EnableServiceAccessLogging: true, // true is the default for backwards-compat
 		EnableProxyProtocol:        false,
-		ClusterCertSecret:          "",
 		IdleTimeout:                0 * time.Second, // default value
 		TrafficIsolation:           "",
 		TrustedHopsCount:           0,
@@ -76,7 +72,6 @@ func NewConfigFromMap(configMap map[string]string) (*Kourier, error) {
 	if err := cm.Parse(configMap,
 		cm.AsBool(enableServiceAccessLoggingKey, &nc.EnableServiceAccessLogging),
 		cm.AsBool(enableProxyProtocol, &nc.EnableProxyProtocol),
-		cm.AsString(clusterCert, &nc.ClusterCertSecret),
 		cm.AsDuration(IdleTimeoutKey, &nc.IdleTimeout),
 		cm.AsString(trafficIsolation, (*string)(&nc.TrafficIsolation)),
 		cm.AsUint32(trustedHopsCount, &nc.TrustedHopsCount),
@@ -102,9 +97,6 @@ type Kourier struct {
 	EnableServiceAccessLogging bool
 	// EnableProxyProtocol specifies whether proxy protocol feature is enabled
 	EnableProxyProtocol bool
-	// ClusterCertSecret specifies the secret name for the server certificates of
-	// Kourier Internal.
-	ClusterCertSecret string
 	// IdleTimeout specifies the amount of time that Kourier waits for incoming requests.
 	// The default value is 5 minutes. This will not interfere any smaller configured
 	// timeouts that may have existed in configurations prior to
