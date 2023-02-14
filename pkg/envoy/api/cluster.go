@@ -51,18 +51,25 @@ func NewCluster(
 		TransportSocket: transportSocket,
 	}
 
-	if isHTTP2 {
-		opts, _ := anypb.New(&httpOptions.HttpProtocolOptions{
-			UpstreamProtocolOptions: &httpOptions.HttpProtocolOptions_ExplicitHttpConfig_{
-				ExplicitHttpConfig: &httpOptions.HttpProtocolOptions_ExplicitHttpConfig{
-					ProtocolConfig: &httpOptions.HttpProtocolOptions_ExplicitHttpConfig_Http2ProtocolOptions{},
-				},
+	options := &httpOptions.HttpProtocolOptions{
+		UpstreamHttpProtocolOptions: &envoycorev3.UpstreamHttpProtocolOptions{AutoSni: true},
+		UpstreamProtocolOptions: &httpOptions.HttpProtocolOptions_ExplicitHttpConfig_{
+			ExplicitHttpConfig: &httpOptions.HttpProtocolOptions_ExplicitHttpConfig{
+				ProtocolConfig: &httpOptions.HttpProtocolOptions_ExplicitHttpConfig_HttpProtocolOptions{},
 			},
-		})
+		},
+	}
 
-		cluster.TypedExtensionProtocolOptions = map[string]*anypb.Any{
-			"envoy.extensions.upstreams.http.v3.HttpProtocolOptions": opts,
+	if isHTTP2 {
+		options.UpstreamProtocolOptions = &httpOptions.HttpProtocolOptions_ExplicitHttpConfig_{
+			ExplicitHttpConfig: &httpOptions.HttpProtocolOptions_ExplicitHttpConfig{
+				ProtocolConfig: &httpOptions.HttpProtocolOptions_ExplicitHttpConfig_Http2ProtocolOptions{},
+			},
 		}
+	}
+	opts, _ := anypb.New(options)
+	cluster.TypedExtensionProtocolOptions = map[string]*anypb.Any{
+		"envoy.extensions.upstreams.http.v3.HttpProtocolOptions": opts,
 	}
 
 	return cluster

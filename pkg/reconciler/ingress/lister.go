@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -77,7 +78,7 @@ func (l *gatewayPodTargetLister) getIngressUrls(ctx context.Context, ing *v1alph
 			target = status.ProbeTarget{
 				PodIPs: ips,
 			}
-			if len(ing.Spec.TLS) != 0 {
+			if hasExternalTLS(ing.Spec.TLS) {
 				target.PodPort = strconv.Itoa(int(config.HTTPSPortProb))
 				target.URLs = domainsToURL(domains, "https")
 			} else {
@@ -111,6 +112,18 @@ func (l *gatewayPodTargetLister) getIngressUrls(ctx context.Context, ing *v1alph
 
 	}
 	return targets, nil
+}
+
+func hasExternalTLS(tls []v1alpha1.IngressTLS) bool {
+	if len(tls) == 0 {
+		return false
+	}
+	for _, t := range tls {
+		if !strings.HasSuffix(t.SecretName, "-internal") {
+			return true
+		}
+	}
+	return false
 }
 
 func domainsToURL(domains []string, scheme string) []*url.URL {
