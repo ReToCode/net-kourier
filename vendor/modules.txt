@@ -968,7 +968,7 @@ knative.dev/control-protocol/pkg/certificates
 # knative.dev/hack v0.0.0-20230428013635-6e4569cc679d
 ## explicit; go 1.18
 knative.dev/hack
-# knative.dev/networking v0.0.0-20230428120551-68725bdd1056
+# knative.dev/networking v0.0.0-20230428120551-68725bdd1056 => github.com/retocode/networking v0.0.0-20230503060951-d9e153cbac71
 ## explicit; go 1.18
 knative.dev/networking/config
 knative.dev/networking/pkg
@@ -1088,3 +1088,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
+# knative.dev/networking => github.com/retocode/networking v0.0.0-20230503060951-d9e153cbac71
