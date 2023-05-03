@@ -74,15 +74,26 @@ func (l *gatewayPodTargetLister) getIngressUrls(ctx context.Context, ing *v1alph
 		scheme := "http"
 
 		if rule.Visibility == v1alpha1.IngressVisibilityExternalIP {
-			target = status.ProbeTarget{
-				PodIPs: ips,
+			tlsProbe := false
+			for _, h := range ing.Spec.TLS {
+				if h.Visibility == v1alpha1.IngressVisibilityExternalIP {
+					tlsProbe = true
+					break
+				}
 			}
-			if len(ing.Spec.TLS) != 0 {
-				target.PodPort = strconv.Itoa(int(config.HTTPSPortProb))
-				target.URLs = domainsToURL(domains, "https")
+
+			if tlsProbe {
+				target = status.ProbeTarget{
+					PodIPs:  ips,
+					PodPort: strconv.Itoa(int(config.HTTPSPortProb)),
+					URLs:    domainsToURL(domains, "https"),
+				}
 			} else {
-				target.PodPort = strconv.Itoa(int(config.HTTPPortProb))
-				target.URLs = domainsToURL(domains, scheme)
+				target = status.ProbeTarget{
+					PodIPs:  ips,
+					PodPort: strconv.Itoa(int(config.HTTPPortProb)),
+					URLs:    domainsToURL(domains, scheme),
+				}
 			}
 		} else {
 			podPort := strconv.Itoa(int(config.HTTPPortInternal))
@@ -100,10 +111,26 @@ func (l *gatewayPodTargetLister) getIngressUrls(ctx context.Context, ing *v1alph
 				}
 			}
 
-			target = status.ProbeTarget{
-				PodIPs:  ips,
-				PodPort: podPort,
-				URLs:    domainsToURL(domains, scheme),
+			tlsProbe := false
+			for _, h := range ing.Spec.TLS {
+				if h.Visibility == v1alpha1.IngressVisibilityClusterLocal {
+					tlsProbe = true
+					break
+				}
+			}
+
+			if tlsProbe {
+				target = status.ProbeTarget{
+					PodIPs:  ips,
+					PodPort: strconv.Itoa(int(config.HTTPSPortInternal)),
+					URLs:    domainsToURL(domains, "https"),
+				}
+			} else {
+				target = status.ProbeTarget{
+					PodIPs:  ips,
+					PodPort: podPort,
+					URLs:    domainsToURL(domains, scheme),
+				}
 			}
 		}
 
