@@ -63,30 +63,39 @@ func (l *gatewayPodTargetLister) ListProbeTargets(ctx context.Context, ing *v1al
 func (l *gatewayPodTargetLister) getIngressUrls(ing *v1alpha1.Ingress, gatewayIps []string) ([]status.ProbeTarget, error) {
 	ips := sets.NewString(gatewayIps...)
 
+	tlsInternal := false
+	tlsExternal := false
+	for _, t := range ing.Spec.TLS {
+		if t.Visibility == "" || t.Visibility == v1alpha1.IngressVisibilityExternalIP {
+			tlsExternal = true
+		}
+		if t.Visibility == v1alpha1.IngressVisibilityClusterLocal {
+			tlsInternal = true
+		}
+	}
+
 	targets := make([]status.ProbeTarget, 0, len(ing.Spec.Rules))
 	for _, rule := range ing.Spec.Rules {
-		var target status.ProbeTarget
+		target := status.ProbeTarget{
+			PodIPs: ips,
+		}
 
-		domains := rule.Hosts
-		scheme := "http"
+		switch {
+		case rule.Visibility == v1alpha1.IngressVisibilityExternalIP && tlsExternal:
+			target.PodPort = strconv.Itoa(int(config.HTTPSPortProb))
+			target.URLs = domainsToURL(rule.Hosts, "https")
 
-		if rule.Visibility == v1alpha1.IngressVisibilityExternalIP {
-			target = status.ProbeTarget{
-				PodIPs: ips,
-			}
-			if len(ing.Spec.TLS) != 0 {
-				target.PodPort = strconv.Itoa(int(config.HTTPSPortProb))
-				target.URLs = domainsToURL(domains, "https")
-			} else {
-				target.PodPort = strconv.Itoa(int(config.HTTPPortProb))
-				target.URLs = domainsToURL(domains, scheme)
-			}
-		} else {
-			target = status.ProbeTarget{
-				PodIPs:  ips,
-				PodPort: strconv.Itoa(int(config.HTTPPortInternal)),
-				URLs:    domainsToURL(domains, scheme),
-			}
+		case rule.Visibility == v1alpha1.IngressVisibilityExternalIP && !tlsExternal:
+			target.PodPort = strconv.Itoa(int(config.HTTPPortProb))
+			target.URLs = domainsToURL(rule.Hosts, "http")
+
+		case rule.Visibility == v1alpha1.IngressVisibilityClusterLocal && tlsInternal:
+			target.PodPort = strconv.Itoa(int(config.HTTPSPortInternal))
+			target.URLs = domainsToURL(rule.Hosts, "https")
+
+		case rule.Visibility == v1alpha1.IngressVisibilityClusterLocal && !tlsInternal:
+			target.PodPort = strconv.Itoa(int(config.HTTPPortInternal))
+			target.URLs = domainsToURL(rule.Hosts, "http")
 		}
 
 		targets = append(targets, target)

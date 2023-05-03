@@ -48,11 +48,13 @@ import (
 
 type translatedIngress struct {
 	name                    types.NamespacedName
-	sniMatches              []*envoy.SNIMatch
+	internalSNIMatches      []*envoy.SNIMatch
+	externalSNIMatches      []*envoy.SNIMatch
 	clusters                []*v3.Cluster
 	externalVirtualHosts    []*route.VirtualHost
 	externalTLSVirtualHosts []*route.VirtualHost
 	internalVirtualHosts    []*route.VirtualHost
+	internalTLSVirtualHosts []*route.VirtualHost
 }
 
 type IngressTranslator struct {
@@ -78,7 +80,8 @@ func NewIngressTranslator(
 func (translator *IngressTranslator) translateIngress(ctx context.Context, ingress *v1alpha1.Ingress, extAuthzEnabled bool) (*translatedIngress, error) {
 	logger := logging.FromContext(ctx)
 
-	sniMatches := make([]*envoy.SNIMatch, 0, len(ingress.Spec.TLS))
+	internalSNIMatches := make([]*envoy.SNIMatch, 0, len(ingress.Spec.TLS))
+	externalSNIMatches := make([]*envoy.SNIMatch, 0, len(ingress.Spec.TLS))
 	for _, ingressTLS := range ingress.Spec.TLS {
 		if err := trackSecret(translator.tracker, ingressTLS.SecretNamespace, ingressTLS.SecretName, ingress); err != nil {
 			return nil, err
@@ -92,8 +95,8 @@ func (translator *IngressTranslator) translateIngress(ctx context.Context, ingre
 		// Validate certificate here as these are defined by users.
 		// We should not send Gateway without validation.
 		_, err = tls.X509KeyPair(
-			secret.Data[certFieldInSecret],
-			secret.Data[keyFieldInSecret],
+			secret.Data[certificates.CertName],
+			secret.Data[certificates.PrivateKeyName],
 		)
 		if err != nil {
 			return nil, fmt.Errorf("invalid secret is specified: %w", err)
@@ -103,14 +106,26 @@ func (translator *IngressTranslator) translateIngress(ctx context.Context, ingre
 			Namespace: ingressTLS.SecretNamespace,
 			Name:      ingressTLS.SecretName,
 		}
-		sniMatches = append(sniMatches, &envoy.SNIMatch{
+		sniMatch := &envoy.SNIMatch{
 			Hosts:            ingressTLS.Hosts,
 			CertSource:       secretRef,
-			CertificateChain: secret.Data[certFieldInSecret],
-			PrivateKey:       secret.Data[keyFieldInSecret]})
+			CertificateChain: secret.Data[certificates.CertName],
+			PrivateKey:       secret.Data[certificates.PrivateKeyName],
+		}
+
+		switch ingressTLS.Visibility {
+		// Also handle empty string as external for reverse-compatibility
+		case "", v1alpha1.IngressVisibilityExternalIP:
+			externalSNIMatches = append(externalSNIMatches, sniMatch)
+		case v1alpha1.IngressVisibilityClusterLocal:
+			internalSNIMatches = append(internalSNIMatches, sniMatch)
+		default:
+			return nil, fmt.Errorf("invalid value: %s for ingress.spec.rule.tls.visibility", ingressTLS.Visibility)
+		}
 	}
 
 	internalHosts := make([]*route.VirtualHost, 0, len(ingress.Spec.Rules))
+	internalTLSHosts := make([]*route.VirtualHost, 0, len(ingress.Spec.Rules))
 	externalHosts := make([]*route.VirtualHost, 0, len(ingress.Spec.Rules))
 	externalTLSHosts := make([]*route.VirtualHost, 0, len(ingress.Spec.Rules))
 	clusters := make([]*v3.Cluster, 0, len(ingress.Spec.Rules))
@@ -275,7 +290,9 @@ func (translator *IngressTranslator) translateIngress(ctx context.Context, ingre
 		}
 
 		internalHosts = append(internalHosts, virtualHost)
-		if rule.Visibility == v1alpha1.IngressVisibilityExternalIP {
+		if rule.Visibility == v1alpha1.IngressVisibilityClusterLocal && virtualTLSHost != nil {
+			internalTLSHosts = append(internalTLSHosts, virtualTLSHost)
+		} else if rule.Visibility == v1alpha1.IngressVisibilityExternalIP {
 			externalHosts = append(externalHosts, virtualHost)
 			if virtualTLSHost != nil {
 				externalTLSHosts = append(externalTLSHosts, virtualTLSHost)
@@ -288,11 +305,13 @@ func (translator *IngressTranslator) translateIngress(ctx context.Context, ingre
 			Namespace: ingress.Namespace,
 			Name:      ingress.Name,
 		},
-		sniMatches:              sniMatches,
+		internalSNIMatches:      internalSNIMatches,
+		externalSNIMatches:      externalSNIMatches,
 		clusters:                clusters,
 		externalVirtualHosts:    externalHosts,
 		externalTLSVirtualHosts: externalTLSHosts,
 		internalVirtualHosts:    internalHosts,
+		internalTLSVirtualHosts: internalTLSHosts,
 	}, nil
 }
 

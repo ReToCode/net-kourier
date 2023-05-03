@@ -39,14 +39,13 @@ import (
 	"knative.dev/net-kourier/pkg/config"
 	envoy "knative.dev/net-kourier/pkg/envoy/api"
 	rconfig "knative.dev/net-kourier/pkg/reconciler/ingress/config"
+	"knative.dev/networking/pkg/certificates"
 	"knative.dev/pkg/system"
 )
 
 const (
 	envCertsSecretNamespace    = "CERTS_SECRET_NAMESPACE"
 	envCertsSecretName         = "CERTS_SECRET_NAME"
-	certFieldInSecret          = "tls.crt"
-	keyFieldInSecret           = "tls.key"
 	externalRouteConfigName    = "external_services"
 	externalTLSRouteConfigName = "external_tls_services"
 	internalRouteConfigName    = "internal_services"
@@ -135,17 +134,23 @@ func (caches *Caches) ToEnvoySnapshot(ctx context.Context) (*cache.Snapshot, err
 	defer caches.mu.Unlock()
 
 	localVHosts := make([]*route.VirtualHost, 0, len(caches.translatedIngresses)+1)
+	localTLSVHosts := make([]*route.VirtualHost, 0, len(caches.translatedIngresses)+1)
 	externalVHosts := make([]*route.VirtualHost, 0, len(caches.translatedIngresses))
 	externalTLSVHosts := make([]*route.VirtualHost, 0, len(caches.translatedIngresses))
-	snis := sniMatches{}
+	internalSNIs := sniMatches{}
+	externalSNIs := sniMatches{}
 
 	for _, translatedIngress := range caches.translatedIngresses {
 		localVHosts = append(localVHosts, translatedIngress.internalVirtualHosts...)
+		localTLSVHosts = append(localTLSVHosts, translatedIngress.internalTLSVirtualHosts...)
 		externalVHosts = append(externalVHosts, translatedIngress.externalVirtualHosts...)
 		externalTLSVHosts = append(externalTLSVHosts, translatedIngress.externalTLSVirtualHosts...)
 
-		for _, match := range translatedIngress.sniMatches {
-			snis.consume(match)
+		for _, match := range translatedIngress.internalSNIMatches {
+			internalSNIs.consume(match)
+		}
+		for _, match := range translatedIngress.externalSNIMatches {
+			externalSNIs.consume(match)
 		}
 	}
 
@@ -157,7 +162,9 @@ func (caches *Caches) ToEnvoySnapshot(ctx context.Context) (*cache.Snapshot, err
 		externalVHosts,
 		externalTLSVHosts,
 		localVHosts,
-		snis.list(),
+		localTLSVHosts,
+		internalSNIs.list(),
+		externalSNIs.list(),
 		caches.kubeClient,
 	)
 	if err != nil {
@@ -213,7 +220,9 @@ func generateListenersAndRouteConfigsAndClusters(
 	externalVirtualHosts []*route.VirtualHost,
 	externalTLSVirtualHosts []*route.VirtualHost,
 	clusterLocalVirtualHosts []*route.VirtualHost,
-	sniMatches []*envoy.SNIMatch,
+	clusterLocalTLSVirtualHosts []*route.VirtualHost,
+	internalSNIMatches []*envoy.SNIMatch,
+	externalSNIMatches []*envoy.SNIMatch,
 	kubeclient kubeclient.Interface) ([]cachetypes.Resource, []cachetypes.Resource, []cachetypes.Resource, error) {
 
 	// This has to be "OrDefaults" because this path is called before the informers are
@@ -225,11 +234,13 @@ func generateListenersAndRouteConfigsAndClusters(
 	externalRouteConfig := envoy.NewRouteConfig(externalRouteConfigName, externalVirtualHosts)
 	externalTLSRouteConfig := envoy.NewRouteConfig(externalTLSRouteConfigName, externalTLSVirtualHosts)
 	internalRouteConfig := envoy.NewRouteConfig(internalRouteConfigName, clusterLocalVirtualHosts)
+	internalTLSRouteConfig := envoy.NewRouteConfig(internalTLSRouteConfigName, clusterLocalTLSVirtualHosts)
 
 	// Now we setup connection managers, that reference the routeconfigs via RDS.
 	externalManager := envoy.NewHTTPConnectionManager(externalRouteConfig.Name, cfg.Kourier)
 	externalTLSManager := envoy.NewHTTPConnectionManager(externalTLSRouteConfig.Name, cfg.Kourier)
 	internalManager := envoy.NewHTTPConnectionManager(internalRouteConfig.Name, cfg.Kourier)
+	internalTLSManager := envoy.NewHTTPConnectionManager(internalTLSRouteConfig.Name, cfg.Kourier)
 
 	externalHTTPEnvoyListener, err := envoy.NewHTTPListener(externalManager, config.HTTPPortExternal, cfg.Kourier.EnableProxyProtocol)
 	if err != nil {
@@ -251,8 +262,33 @@ func generateListenersAndRouteConfigsAndClusters(
 	}
 	listeners = append(listeners, probHTTPListener)
 
-	// Add internal listeners and routes when internal cert secret is specified.
-	if cfg.Kourier.ClusterCertSecret != "" {
+	// Configure TLS listener for cluster-local traffic.
+	// If there's at least one ingress that contains the TLS field, that takes precedence.
+	// If there is not, TLS will be configured using a single cert for all the services when the certificate is configured.
+	if len(internalSNIMatches) > 0 {
+		internalHTTPSEnvoyListener, err := envoy.NewHTTPSListenerWithSNI(
+			internalTLSManager, config.HTTPSPortInternal,
+			internalSNIMatches, cfg.Kourier,
+		)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		probeConfig := cfg.Kourier
+		probeConfig.EnableProxyProtocol = false // Disable proxy protocol for prober.
+
+		// create https prob listener with SNI
+		probHTTPSListener, err := envoy.NewHTTPSListenerWithSNI(
+			internalManager, config.HTTPSPortProb,
+			internalSNIMatches, probeConfig,
+		)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		listeners = append(listeners, internalHTTPSEnvoyListener, probHTTPSListener)
+		routes = append(routes, internalTLSRouteConfig)
+	} else if cfg.Kourier.ClusterCertSecret != "" {
 		internalTLSRouteConfig := envoy.NewRouteConfig(internalTLSRouteConfigName, clusterLocalVirtualHosts)
 		internalTLSManager := envoy.NewHTTPConnectionManager(internalTLSRouteConfig.Name, cfg.Kourier)
 
@@ -272,10 +308,10 @@ func generateListenersAndRouteConfigsAndClusters(
 	// Configure TLS Listener. If there's at least one ingress that contains the
 	// TLS field, that takes precedence. If there is not, TLS will be configured
 	// using a single cert for all the services if the creds are given via ENV.
-	if len(sniMatches) > 0 {
+	if len(externalSNIMatches) > 0 {
 		externalHTTPSEnvoyListener, err := envoy.NewHTTPSListenerWithSNI(
 			externalTLSManager, config.HTTPSPortExternal,
-			sniMatches, cfg.Kourier,
+			externalSNIMatches, cfg.Kourier,
 		)
 		if err != nil {
 			return nil, nil, nil, err
@@ -287,7 +323,7 @@ func generateListenersAndRouteConfigsAndClusters(
 		// create https prob listener with SNI
 		probHTTPSListener, err := envoy.NewHTTPSListenerWithSNI(
 			externalManager, config.HTTPSPortProb,
-			sniMatches, probeConfig,
+			externalSNIMatches, probeConfig,
 		)
 		if err != nil {
 			return nil, nil, nil, err
@@ -377,7 +413,7 @@ func sslCreds(ctx context.Context, kubeClient kubeclient.Interface, secretNamesp
 		return nil, nil, err
 	}
 
-	return secret.Data[certFieldInSecret], secret.Data[keyFieldInSecret], nil
+	return secret.Data[certificates.CertName], secret.Data[certificates.PrivateKeyName], nil
 }
 
 func newExternalEnvoyListenerWithOneCertFilterChain(ctx context.Context, manager *httpconnmanagerv3.HttpConnectionManager, kubeClient kubeclient.Interface, cfg *config.Kourier) (*v3.FilterChain, error) {

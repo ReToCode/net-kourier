@@ -93,7 +93,8 @@ func TestIngressTranslator(t *testing.T) {
 					Namespace: "simplens",
 					Name:      "simplename",
 				},
-				sniMatches: []*envoy.SNIMatch{},
+				externalSNIMatches: []*envoy.SNIMatch{},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -107,6 +108,7 @@ func TestIngressTranslator(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}, {
@@ -156,7 +158,7 @@ func TestIngressTranslator(t *testing.T) {
 					Namespace: "testspace",
 					Name:      "testname",
 				},
-				sniMatches: []*envoy.SNIMatch{{
+				externalSNIMatches: []*envoy.SNIMatch{{
 					Hosts: []string{"foo.example.com"},
 					CertSource: types.NamespacedName{
 						Namespace: "secretns",
@@ -165,6 +167,7 @@ func TestIngressTranslator(t *testing.T) {
 					CertificateChain: cert,
 					PrivateKey:       privateKey,
 				}},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -178,6 +181,7 @@ func TestIngressTranslator(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: vHosts,
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}, {
@@ -248,7 +252,7 @@ func TestIngressTranslator(t *testing.T) {
 					Namespace: "testspace",
 					Name:      "testname",
 				},
-				sniMatches: []*envoy.SNIMatch{{
+				externalSNIMatches: []*envoy.SNIMatch{{
 					Hosts: []string{"foo.example.com"},
 					CertSource: types.NamespacedName{
 						Namespace: "secretns",
@@ -257,6 +261,7 @@ func TestIngressTranslator(t *testing.T) {
 					CertificateChain: cert,
 					PrivateKey:       privateKey,
 				}},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -270,6 +275,7 @@ func TestIngressTranslator(t *testing.T) {
 				externalVirtualHosts:    vHostsRedirect,
 				externalTLSVirtualHosts: vHosts,
 				internalVirtualHosts:    vHostsRedirect,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}, {
@@ -322,7 +328,7 @@ func TestIngressTranslator(t *testing.T) {
 					Namespace: "testspace",
 					Name:      "testname",
 				},
-				sniMatches: []*envoy.SNIMatch{{
+				externalSNIMatches: []*envoy.SNIMatch{{
 					Hosts: []string{"foo.example.com"},
 					CertSource: types.NamespacedName{
 						Namespace: "secretns",
@@ -331,6 +337,7 @@ func TestIngressTranslator(t *testing.T) {
 					CertificateChain: cert,
 					PrivateKey:       privateKey,
 				}},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -344,6 +351,7 @@ func TestIngressTranslator(t *testing.T) {
 				externalVirtualHosts:    []*route.VirtualHost{},
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: vHosts,
 			}
 		}(),
 	}, {
@@ -427,7 +435,8 @@ func TestIngressTranslator(t *testing.T) {
 					Namespace: "testspace",
 					Name:      "testname",
 				},
-				sniMatches: []*envoy.SNIMatch{},
+				externalSNIMatches: []*envoy.SNIMatch{},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -457,6 +466,7 @@ func TestIngressTranslator(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}, {
@@ -501,7 +511,8 @@ func TestIngressTranslator(t *testing.T) {
 					Namespace: "testspace",
 					Name:      "testname",
 				},
-				sniMatches: []*envoy.SNIMatch{},
+				externalSNIMatches: []*envoy.SNIMatch{},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -515,6 +526,7 @@ func TestIngressTranslator(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}, {
@@ -559,7 +571,8 @@ func TestIngressTranslator(t *testing.T) {
 					Namespace: "testspace",
 					Name:      "testname",
 				},
-				sniMatches: []*envoy.SNIMatch{},
+				externalSNIMatches: []*envoy.SNIMatch{},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -573,6 +586,7 @@ func TestIngressTranslator(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}, {
@@ -618,7 +632,8 @@ func TestIngressTranslator(t *testing.T) {
 					Namespace: "testspace",
 					Name:      "testname",
 				},
-				sniMatches: []*envoy.SNIMatch{},
+				externalSNIMatches: []*envoy.SNIMatch{},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -632,6 +647,7 @@ func TestIngressTranslator(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}, {
@@ -748,7 +764,7 @@ func TestIngressTranslatorWithHTTPOptionDisabled(t *testing.T) {
 					Namespace: "testspace",
 					Name:      "testname",
 				},
-				sniMatches: []*envoy.SNIMatch{{
+				externalSNIMatches: []*envoy.SNIMatch{{
 					Hosts: []string{"foo.example.com"},
 					CertSource: types.NamespacedName{
 						Namespace: "secretns",
@@ -757,6 +773,7 @@ func TestIngressTranslatorWithHTTPOptionDisabled(t *testing.T) {
 					CertificateChain: cert,
 					PrivateKey:       privateKey,
 				}},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -770,6 +787,7 @@ func TestIngressTranslatorWithHTTPOptionDisabled(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: vHosts,
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}, {
@@ -822,7 +840,7 @@ func TestIngressTranslatorWithHTTPOptionDisabled(t *testing.T) {
 					Namespace: "testspace",
 					Name:      "testname",
 				},
-				sniMatches: []*envoy.SNIMatch{{
+				externalSNIMatches: []*envoy.SNIMatch{{
 					Hosts: []string{"foo.example.com"},
 					CertSource: types.NamespacedName{
 						Namespace: "secretns",
@@ -831,6 +849,7 @@ func TestIngressTranslatorWithHTTPOptionDisabled(t *testing.T) {
 					CertificateChain: cert,
 					PrivateKey:       privateKey,
 				}},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -844,6 +863,7 @@ func TestIngressTranslatorWithHTTPOptionDisabled(t *testing.T) {
 				externalVirtualHosts:    []*route.VirtualHost{},
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: vHosts,
 			}
 		}(),
 	}}
@@ -928,7 +948,8 @@ func TestIngressTranslatorWithUpstreamTLS(t *testing.T) {
 					Namespace: "simplens",
 					Name:      "simplename",
 				},
-				sniMatches: []*envoy.SNIMatch{},
+				externalSNIMatches: []*envoy.SNIMatch{},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -945,6 +966,7 @@ func TestIngressTranslatorWithUpstreamTLS(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}, {
@@ -1000,7 +1022,8 @@ func TestIngressTranslatorWithUpstreamTLS(t *testing.T) {
 					Namespace: "simplens",
 					Name:      "simplename",
 				},
-				sniMatches: []*envoy.SNIMatch{},
+				externalSNIMatches: []*envoy.SNIMatch{},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -1017,6 +1040,7 @@ func TestIngressTranslatorWithUpstreamTLS(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}, {
@@ -1073,7 +1097,8 @@ func TestIngressTranslatorWithUpstreamTLS(t *testing.T) {
 					Namespace: "simplens",
 					Name:      "simplename",
 				},
-				sniMatches: []*envoy.SNIMatch{},
+				externalSNIMatches: []*envoy.SNIMatch{},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -1090,6 +1115,7 @@ func TestIngressTranslatorWithUpstreamTLS(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}, {
@@ -1146,7 +1172,8 @@ func TestIngressTranslatorWithUpstreamTLS(t *testing.T) {
 					Namespace: "simplens",
 					Name:      "simplename",
 				},
-				sniMatches: []*envoy.SNIMatch{},
+				externalSNIMatches: []*envoy.SNIMatch{},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -1163,6 +1190,7 @@ func TestIngressTranslatorWithUpstreamTLS(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}}
@@ -1246,7 +1274,8 @@ func TestIngressTranslatorHTTP01Challenge(t *testing.T) {
 					Namespace: "simplens",
 					Name:      "simplename",
 				},
-				sniMatches: []*envoy.SNIMatch{},
+				externalSNIMatches: []*envoy.SNIMatch{},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"simplens/cm-acme-http-solver",
@@ -1260,6 +1289,7 @@ func TestIngressTranslatorHTTP01Challenge(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}
@@ -1353,7 +1383,8 @@ func TestIngressTranslatorDomainMappingDisableHTTP2(t *testing.T) {
 					Namespace: "simplens",
 					Name:      "simplename",
 				},
-				sniMatches: []*envoy.SNIMatch{},
+				externalSNIMatches: []*envoy.SNIMatch{},
+				internalSNIMatches: []*envoy.SNIMatch{},
 				clusters: []*v3.Cluster{
 					envoy.NewCluster(
 						"servicens/servicename",
@@ -1369,6 +1400,7 @@ func TestIngressTranslatorDomainMappingDisableHTTP2(t *testing.T) {
 				externalVirtualHosts:    vHosts,
 				externalTLSVirtualHosts: []*route.VirtualHost{},
 				internalVirtualHosts:    vHosts,
+				internalTLSVirtualHosts: []*route.VirtualHost{},
 			}
 		}(),
 	}

@@ -191,7 +191,7 @@ func TestTLSListenerWithEnvCertsSecret(t *testing.T) {
 
 	t.Run("without SNI matches", func(t *testing.T) {
 		translatedIngress := &translatedIngress{
-			sniMatches: nil,
+			externalSNIMatches: nil,
 		}
 		err := caches.addTranslatedIngress(translatedIngress)
 		assert.NilError(t, err)
@@ -206,7 +206,7 @@ func TestTLSListenerWithEnvCertsSecret(t *testing.T) {
 
 	t.Run("with a single SNI match", func(t *testing.T) {
 		translatedIngress := &translatedIngress{
-			sniMatches: []*envoy.SNIMatch{fooSNIMatch},
+			externalSNIMatches: []*envoy.SNIMatch{fooSNIMatch},
 		}
 		err := caches.addTranslatedIngress(translatedIngress)
 		assert.NilError(t, err)
@@ -233,7 +233,7 @@ func TestTLSListenerWithEnvCertsSecret(t *testing.T) {
 
 	t.Run("with multiple SNI matches", func(t *testing.T) {
 		translatedIngress := &translatedIngress{
-			sniMatches: []*envoy.SNIMatch{fooSNIMatch, barSNIMatch},
+			externalSNIMatches: []*envoy.SNIMatch{fooSNIMatch, barSNIMatch},
 		}
 		err := caches.addTranslatedIngress(translatedIngress)
 		assert.NilError(t, err)
@@ -292,7 +292,7 @@ func TestTLSListenerWithInternalCertSecret(t *testing.T) {
 
 	t.Run("without SNI matches", func(t *testing.T) {
 		translatedIngress := &translatedIngress{
-			sniMatches: nil,
+			externalSNIMatches: nil,
 		}
 		err := caches.addTranslatedIngress(translatedIngress)
 		assert.NilError(t, err)
@@ -423,7 +423,7 @@ func createTestDataForIngress(
 		externalVirtualHosts:    []*route.VirtualHost{{Name: externalVHostName, Domains: []string{externalVHostName}}},
 		externalTLSVirtualHosts: []*route.VirtualHost{{Name: externalTLSVHostName, Domains: []string{externalTLSVHostName}}},
 		internalVirtualHosts:    []*route.VirtualHost{{Name: internalVHostName, Domains: []string{internalVHostName}}},
-		sniMatches: []*envoy.SNIMatch{{
+		externalSNIMatches: []*envoy.SNIMatch{{
 			Hosts:            []string{"foo.example.com"},
 			CertSource:       types.NamespacedName{Namespace: "secretns", Name: "secretname"},
 			CertificateChain: cert,
@@ -460,7 +460,7 @@ func TestValidateIngress(t *testing.T) {
 		externalTLSVirtualHosts: []*route.VirtualHost{{Name: "external_tls_host_for_ingress_2", Domains: []string{"external__tlshost_for_ingress_2"}}},
 		//This domain should clash with the cached ingress.
 		internalVirtualHosts: []*route.VirtualHost{{Name: "internal_host_for_ingress_2", Domains: []string{"internal_host_for_ingress_1"}}},
-		sniMatches: []*envoy.SNIMatch{{
+		externalSNIMatches: []*envoy.SNIMatch{{
 			Hosts:            []string{"foo.example.com"},
 			CertSource:       types.NamespacedName{Namespace: "secretns", Name: "secretname"},
 			CertificateChain: cert,
