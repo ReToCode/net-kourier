@@ -76,7 +76,7 @@ func (l *gatewayPodTargetLister) getIngressUrls(ctx context.Context, ing *v1alph
 		if rule.Visibility == v1alpha1.IngressVisibilityExternalIP {
 			tlsProbe := false
 			for _, h := range ing.Spec.TLS {
-				if h.Visibility == v1alpha1.IngressVisibilityExternalIP {
+				if h.Visibility == "" || h.Visibility == v1alpha1.IngressVisibilityExternalIP {
 					tlsProbe = true
 					break
 				}

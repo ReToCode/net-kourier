@@ -108,7 +108,8 @@ func (translator *IngressTranslator) translateIngress(ctx context.Context, ingre
 		}
 
 		switch ingressTLS.Visibility {
-		case v1alpha1.IngressVisibilityExternalIP:
+		// Also handle empty string as external for reverse-compatibility
+		case "", v1alpha1.IngressVisibilityExternalIP:
 			externalSNIMatches = append(externalSNIMatches, sniMatch)
 		case v1alpha1.IngressVisibilityClusterLocal:
 			internalSNIMatches = append(internalSNIMatches, sniMatch)
