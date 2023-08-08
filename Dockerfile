@@ -4,6 +4,7 @@ COPY . .
 RUN go build -mod vendor -o /tmp/kourier ./cmd/kourier
 
 FROM openshift/origin-base
+
 USER 65532
 
 COPY --from=builder /tmp/kourier /ko-app/kourier

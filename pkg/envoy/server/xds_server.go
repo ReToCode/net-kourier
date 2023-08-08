@@ -61,6 +61,7 @@ type healthServer struct {
 
 // Check implements the HealthServer interface.
 func (healthServer) Check(context.Context, *health.HealthCheckRequest) (*health.HealthCheckResponse, error) {
+	fmt.Println("healthServer.Check() called, returning", health.HealthCheckResponse_SERVING)
 	return &health.HealthCheckResponse{Status: health.HealthCheckResponse_SERVING}, nil
 }
 
@@ -76,28 +77,39 @@ func (envoyXdsServer *XdsServer) RunManagementServer() error {
 	}
 
 	// register services
+	fmt.Println("RegisterAggregatedDiscoveryServiceServer")
 	discovery.RegisterAggregatedDiscoveryServiceServer(grpcServer, server)
+	fmt.Println("RegisterHealthServer")
 	health.RegisterHealthServer(grpcServer, healthServer{})
+	fmt.Println("RegisterClusterDiscoveryServiceServer")
 	cluster.RegisterClusterDiscoveryServiceServer(grpcServer, server)
+	fmt.Println("RegisterListenerDiscoveryServiceServer")
 	listener.RegisterListenerDiscoveryServiceServer(grpcServer, server)
+	fmt.Println("RegisterRouteDiscoveryServiceServer")
 	route.RegisterRouteDiscoveryServiceServer(grpcServer, server)
+	fmt.Println("After register services")
 
 	errCh := make(chan error)
 	go func() {
+		fmt.Println("xds_server.Serve()")
 		if err = grpcServer.Serve(lis); err != nil {
 			errCh <- err
 		}
+		fmt.Println("after channel: xds_server.Serve()")
 	}()
 
 	select {
 	case <-envoyXdsServer.ctx.Done():
+		fmt.Println("envoyXdsServer.ctx.Done() triggered")
 		grpcServer.GracefulStop()
 		return nil
 	case err := <-errCh:
+		fmt.Println("got signal on errCh", err)
 		return fmt.Errorf("failed to serve: %w", err)
 	}
 }
 
 func (envoyXdsServer *XdsServer) SetSnapshot(nodeID string, snapshot cache.ResourceSnapshot) error {
+	fmt.Println("envoyXdsServer.SetSnapshot()", nodeID)
 	return envoyXdsServer.snapshotCache.SetSnapshot(context.Background(), nodeID, snapshot)
 }

@@ -281,7 +281,9 @@ func MainWithConfig(ctx context.Context, component string, cfg *rest.Config, cto
 	}
 
 	// Start the injection clients and informers.
+	logger.Info("Starting informers...")
 	startInformers()
+	logger.Info("Done starting informers...")
 
 	// Wait for webhook informers to sync.
 	if wh != nil {
@@ -295,6 +297,8 @@ func MainWithConfig(ctx context.Context, component string, cfg *rest.Config, cto
 	// This will block until either a signal arrives or one of the grouped functions
 	// returns an error.
 	<-egCtx.Done()
+
+	logger.Info("egCtx.Done()")
 
 	profilingServer.Shutdown(context.Background())
 	// Don't forward ErrServerClosed as that indicates we're already shutting down.

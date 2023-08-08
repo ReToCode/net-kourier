@@ -18,6 +18,7 @@ package ingress
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
@@ -80,6 +81,7 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 	namespaceInformer := nsinformer.Get(ctx)
 
 	// Create a new Cache, with the Readiness endpoint enabled, and the list of current Ingresses.
+	logger.Infof("NewCaches()")
 	caches, err := generator.NewCaches(ctx, kubernetesClient, config.ExternalAuthz.Enabled)
 	if err != nil {
 		logger.Fatalw("Failed create new caches", zap.Error(err))
@@ -90,7 +92,7 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 		extAuthz:        config.ExternalAuthz.Enabled,
 		namespaceLister: namespaceInformer.Lister(),
 	}
-
+	logger.Infof("NewImpl()")
 	impl := v1alpha1ingress.NewImpl(ctx, r, config.KourierIngressClassName, func(impl *controller.Impl) controller.Options {
 		configsToResync := []interface{}{
 			&netconfig.Config{},
@@ -116,6 +118,7 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 		}, ingressInformer.Informer())
 	}
 
+	logger.Infof("NewXdsServer()")
 	envoyXdsServer := envoy.NewXdsServer(
 		managementPort,
 		&xds.CallbackFuncs{
@@ -160,6 +163,7 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 	)
 	r.xdsServer = envoyXdsServer
 
+	logger.Infof("NewProber()")
 	statusProber := status.NewProber(
 		logger.Named("status-manager"),
 		NewProbeTargetLister(logger, endpointsInformer.Lister(), namespaceInformer.Lister()),
@@ -168,6 +172,7 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 			impl.EnqueueKey(types.NamespacedName{Namespace: ing.Namespace, Name: ing.Name})
 		})
 	r.statusManager = statusProber
+	logger.Infof("statusProber.Start()")
 	statusProber.Start(ctx.Done())
 
 	r.caches.SetOnEvicted(func(key types.NamespacedName, value interface{}) {
@@ -177,6 +182,7 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 		impl.EnqueueKey(key)
 	})
 
+	logger.Infof("NewIngressTranslator")
 	ingressTranslator := generator.NewIngressTranslator(
 		func(ns, name string) (*corev1.Secret, error) {
 			return secretInformer.Lister().Secrets(ns).Get(name)
@@ -194,16 +200,19 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 	r.ingressTranslator = &ingressTranslator
 
 	// Initialize the Envoy snapshot.
+	logger.Infof("ToEnvoySnapshot()")
 	snapshot, err := r.caches.ToEnvoySnapshot(ctx)
 	if err != nil {
 		logger.Fatalw("Failed to create snapshot", zap.Error(err))
 	}
+	logger.Infof("SetSnapshot()")
 	err = r.xdsServer.SetSnapshot(nodeID, snapshot)
 	if err != nil {
 		logger.Fatalw("Failed to set snapshot", zap.Error(err))
 	}
 
 	// Get the current list of ingresses that are ready and seed the Envoy config with them.
+	logger.Infof("getReadyIngresses()")
 	ingressesToSync, err := getReadyIngresses(ctx, knativeClient.NetworkingV1alpha1())
 	if err != nil {
 		logger.Fatalw("Failed to fetch ready ingresses", zap.Error(err))
@@ -212,6 +221,7 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 
 	// The startup translator uses clients instead of listeners to correctly list all
 	// resources at startup.
+	logger.Infof("NewIngressTranslator()")
 	startupTranslator := generator.NewIngressTranslator(
 		func(ns, name string) (*corev1.Secret, error) {
 			return kubernetesClient.CoreV1().Secrets(ns).Get(ctx, name, metav1.GetOptions{})
@@ -234,6 +244,7 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 		}
 	}
 	// Update the entire batch of ready ingresses at once.
+	logger.Infof("updateEnvoyConfig()")
 	if err := r.updateEnvoyConfig(ctx); err != nil {
 		logger.Fatalw("Failed to set initial envoy config", zap.Error(err))
 	}
@@ -244,6 +255,7 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 		if err := envoyXdsServer.RunManagementServer(); err != nil {
 			logger.Fatalw("Failed to serve XDS Server", zap.Error(err))
 		}
+		logger.Info("After Start Management Server on Port ", managementPort)
 	}()
 
 	// Ingresses need to be filtered by ingress class, so Kourier does not
@@ -310,11 +322,13 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 		},
 	})
 
+	logger.Infof("return impl")
 	return impl
 }
 
 func getReadyIngresses(ctx context.Context, knativeClient networkingClientSet.NetworkingV1alpha1Interface) ([]*v1alpha1.Ingress, error) {
 	ingresses, err := knativeClient.Ingresses("").List(ctx, metav1.ListOptions{})
+	fmt.Println("getReadyIngresses.List(): ", len(ingresses.Items))
 	if err != nil {
 		return nil, err
 	}
