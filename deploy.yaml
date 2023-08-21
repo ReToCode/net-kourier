@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-health-debug
+  namespace: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grpc-health-debug
+  template:
+    metadata:
+      labels:
+        app: grpc-health-debug
+    spec:
+      containers:
+        - image: quay.io/rlehmann/gprc-health:latest
+          name: grpc-health-debug
+          readinessProbe:
+            exec:
+              command: ["/ko-app/main.go", "-probe-addr=:18000"]
+            periodSeconds: 30
+            failureThreshold: 30
+          livenessProbe:
+            exec:
+              command: [ "/ko-app/main.go", "-probe-addr=:18000" ]
+            periodSeconds: 30
+            failureThreshold: 60
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
